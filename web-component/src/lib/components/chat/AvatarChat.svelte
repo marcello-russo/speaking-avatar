@@ -166,11 +166,11 @@
 	const dispatch = createEventDispatcher();
 
 	// Get the currently selected avatar ID from settings
-	let selectedAvatarId = ($settings as any)?.selectedAvatarId || 'The Scholar';
+	let selectedAvatarId = ($settings as any)?.selectedAvatarId || 'The Coach';
 
 	onMount(async () => {
 		// Retrieve avatar selection from user settings, with fallback
-		selectedAvatarId = ($settings as any)?.selectedAvatarId || 'The Scholar';
+		selectedAvatarId = ($settings as any)?.selectedAvatarId || 'The Coach';
 
 		console.log(`Using avatar: ${selectedAvatarId}`);
 
