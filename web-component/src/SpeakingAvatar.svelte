@@ -7,7 +7,7 @@
   export let theme: string = 'light';
   export let apiurl: string = 'http://localhost:8000/api/v1';
   export let accent: string = '#6366f1';
-  export let avatar: string = 'The Scholar';
+  export let avatar: string = 'The Coach';
   export let fab: string = 'true';
   export let title: string = 'AI Tutor';
 

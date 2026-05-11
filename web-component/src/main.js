@@ -7,7 +7,7 @@ class SpeakingAvatarElement extends HTMLElement {
     const theme = this.getAttribute('theme') || 'light';
     const accent = this.getAttribute('accent') || '#6366f1';
     const apiurl = this.getAttribute('apiurl') || 'http://localhost:8000/api/v1';
-    const avatar = this.getAttribute('avatar') || 'The Scholar';
+    const avatar = this.getAttribute('avatar') || 'The Coach';
     const title = this.getAttribute('title') || 'AI Tutor';
     const fab = this.getAttribute('fab') || 'true';
 
