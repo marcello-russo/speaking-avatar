@@ -1,5 +1,3 @@
-<svelte:options customElement="speaking-avatar" />
-
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import AvatarChat from '$lib/components/chat/AvatarChat.svelte';
@@ -56,12 +54,12 @@
 </script>
 
 <div class="root" class:dark={theme === 'dark'} style="--accent: {accent};">
-  <div class="avatar-section">
-    {#key avatar}
-      <AvatarChat {currentMessage} {speaking} useClassroom={false}
-        on:speechend={() => { speaking = false; }} />
-    {/key}
-  </div>
+    <div class="avatar-section">
+      {#key avatar}
+        <AvatarChat {currentMessage} {speaking} useClassroom={false}
+          on:speechend={() => { speaking = false; }} />
+      {/key}
+    </div>
 
   {#if chatOpen}
     <div class="chat-panel">
@@ -91,10 +89,10 @@
 </div>
 
 <style>
-  .root { position: fixed; inset: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .root { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   .root.dark { background: #0a0a14; color: #e2e8f0; }
   .root:not(.dark) { background: #f8f9fc; color: #1e293b; }
-  .avatar-section { width: 100%; height: 100%; }
+  .avatar-section { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
   .avatar-section :global(canvas) { width: 100% !important; height: 100% !important; }
 
   .chat-panel {
