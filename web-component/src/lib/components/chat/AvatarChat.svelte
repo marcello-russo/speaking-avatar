@@ -11,7 +11,7 @@
 	export let history = {}; // Chat history
 	export let currentMessage = ''; // Current message to speak
 	export let speaking = false; // Whether the avatar is speaking
-	export let className = 'h-full flex pt-8'; // CSS classes
+	export let className = ''; // CSS classes (optional)
 	export let useClassroom = true; // Whether to display classroom background
 	export let classroomModel: 'default' | 'alternative' = 'default'; // Which classroom model to use
 
@@ -199,21 +199,23 @@
 
 		// Set up Three.js scene
 		scene = new THREE.Scene();
-		scene.background = null; // Transparent background for better UI integration
+		scene.background = null;
 
 		// Use container dimensions for proper sizing
 		const width = avatarContainer.clientWidth;
 		const height = avatarContainer.clientHeight;
+		console.log('[SPEAKING-AVATAR] container:', {width, height});
+		console.log('[SPEAKING-AVATAR] parent:', avatarContainer.parentElement?.clientWidth, avatarContainer.parentElement?.clientHeight);
+		console.log('[SPEAKING-AVATAR] root:', document.querySelector('.root')?.clientWidth, document.querySelector('.root')?.clientHeight);
 
-		// Initialize perspective camera at optimal distance for headshot view
-		camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-		if (useClassroom) {
-			// Position camera to see both avatar and classroom - raised slightly to make room for input
-			camera.position.set(0, 1.8, 4.3); // Raised Y position to leave space at bottom
-		} else {
-			// Original camera position for avatar only
-			camera.position.set(0, 1.6, 2.2);
-		}
+		// Dynamic camera distance based on viewport
+		const baseDistance = useClassroom ? 4.3 : 1.0;
+		const viewportRatio = height / 1080;
+		const cameraDistance = Math.max(baseDistance * (0.5 + viewportRatio * 0.5), 0.6);
+		const cameraHeight = useClassroom ? 1.8 : 1.3;
+
+		camera = new THREE.PerspectiveCamera(useClassroom ? 45 : 60, width / height, 0.1, 1000);
+		camera.position.set(0, cameraHeight, cameraDistance);
 
 		// Configure renderer with transparency support
 		renderer = new THREE.WebGLRenderer({
@@ -2539,7 +2541,7 @@
 	}
 </script>
 
-<div class={className} bind:this={avatarContainer}>
+<div class={className} bind:this={avatarContainer} style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;">
 	{#if loading}
 		<div class="flex items-center justify-center w-full h-full">
 			<Spinner />
