@@ -10,4 +10,17 @@ export default defineConfig({
       $lib: path.resolve('./src/lib'),
     },
   },
+  build: {
+    lib: {
+      entry: path.resolve('./src/main.js'),
+      name: 'SpeakingAvatar',
+      formats: ['es', 'umd'],
+      fileName: (format) => `speaking-avatar.${format}.js`,
+    },
+    rollupOptions: {
+      output: {
+        globals: {},
+      },
+    },
+  },
 })
