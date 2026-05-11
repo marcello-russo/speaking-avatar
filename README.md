@@ -41,21 +41,45 @@
 
 ## 🚀 Quick Start
 
+### Option 1: Docker (recommended — full stack)
+
 ```bash
 git clone https://github.com/marcello-russo/speaking-avatar
 cd speaking-avatar
-
 cp backend/.env.example backend/.env
 # Edit backend/.env → add your OPENROUTER_API_KEY
-
 docker compose up -d
 ```
 
-Open **http://localhost:5173** — click 💬 to chat with the 3D avatar.
+Open **http://localhost:5173** → click 💬 to chat.
+
+### Option 2: Import in your app (2 lines)
+
+```html
+<script type="module" src="http://localhost:5173/src/main.js"></script>
+<speaking-avatar context="Mathematics" accent="#6366f1"></speaking-avatar>
+```
+
+> The web component auto-registers. Just add the `<script>` tag and the `<speaking-avatar>` element anywhere in your HTML.
+
+### Option 3: Self-hosted build
+
+```bash
+cd web-component
+npm run build
+npx serve dist    # or any static file server
+```
+
+```html
+<script src="https://your-cdn.com/speaking-avatar.umd.js"></script>
+<speaking-avatar context="Biology" theme="light"></speaking-avatar>
+```
 
 ## 📦 Integration
 
-### In any HTML page
+The `<speaking-avatar>` web component works in any framework. Here's how to use it:
+
+### Vanilla HTML
 
 ```html
 <!doctype html>
@@ -64,33 +88,53 @@ Open **http://localhost:5173** — click 💬 to chat with the 3D avatar.
   <script type="module" src="http://localhost:5173/src/main.js"></script>
 </head>
 <body>
-  <speaking-avatar
-    context="Mathematics"
-    theme="light"
-    accent="#6366f1"
-    avatar="The Coach"
-  ></speaking-avatar>
+  <speaking-avatar context="Mathematics" theme="light"></speaking-avatar>
 </body>
 </html>
 ```
 
-### In React
+### React
 
 ```jsx
-useEffect(() => {
-  import('http://localhost:5173/src/main.js');
-}, []);
-
-return <speaking-avatar context="Physics" accent="#10b981" />;
+function App() {
+  useEffect(() => {
+    import('http://localhost:5173/src/main.js');
+  }, []);
+  return <speaking-avatar context="Physics" accent="#10b981" />;
+}
 ```
 
-### In Moodle
+### Vue
 
-Add a custom HTML block with:
+```vue
+<template>
+  <speaking-avatar context="Chemistry" theme="dark" />
+</template>
+<script setup>
+  onMounted(() => import('http://localhost:5173/src/main.js'));
+</script>
+```
+
+### Moodle (add as HTML block)
+
+In any course page, add a Custom HTML block:
+
 ```html
 <a href="http://localhost:5173/?course=Mathematics" class="btn btn-primary" target="_blank">
   🎓 Study with AI Tutor
 </a>
+```
+
+### Passing context (documents, files)
+
+```html
+<!-- Single context -->
+<speaking-avatar context="Linear Algebra - Chapter 3"></speaking-avatar>
+
+<!-- Multiple documents (URL-encoded JSON) -->
+<speaking-avatar
+  context='[{"title":"Chapter 1","url":"https://..."},{"title":"Notes","url":"https://..."}]'
+></speaking-avatar>
 ```
 
 ## 🎮 Props
