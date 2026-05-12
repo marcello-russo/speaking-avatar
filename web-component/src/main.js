@@ -13,8 +13,6 @@ class SpeakingAvatarElement extends HTMLElement {
     };
 
     this.style.display = 'block';
-    this.style.width = '100%';
-    this.style.height = '100%';
 
     const inst = mount(SpeakingAvatar, { target: this, props });
 
