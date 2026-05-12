@@ -5,12 +5,12 @@ To integrate Speaking Avatar into Moodle, add this to your Moodle `config.php`:
 ```php
 $CFG->additionalhtmlfooter = '
 <div id="sa-mount"></div>
-<script src="https://cdn.jsdelivr.net/npm/speaking-avatar@1.0.1/dist/speaking-avatar.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/speaking-avatar@1.0.2/dist/speaking-avatar.umd.js"></script>
 <script>
 (function() {
   var r=0,m=50,w=setInterval(function(){if(window.customElements&&customElements.get("speaking-avatar")){clearInterval(w);i();}else if(++r>m)clearInterval(w);},200);
   function i(){
-    window.__AVATAR_STATIC_BASE__="https://cdn.jsdelivr.net/npm/speaking-avatar@1.0.1/dist/";
+    window.__AVATAR_STATIC_BASE__="https://cdn.jsdelivr.net/npm/speaking-avatar@1.0.2/dist/";
     var e=document.createElement("speaking-avatar");
     e.setAttribute("tts-api","http://localhost:8000/api/v1/tts");e.setAttribute("stt-api","http://localhost:8000/api/v1/stt");e.setAttribute("llm-api","http://localhost:8000/api/v1/chat");
     e.style.cssText="position:fixed;bottom:20px;right:20px;width:120px;height:160px;z-index:9999;border-radius:12px;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.15);background:white;overflow:hidden;display:block;";
