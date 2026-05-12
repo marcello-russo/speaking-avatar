@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import AvatarChat from '$lib/components/chat/AvatarChat.svelte';
-  import AvatarWrapper from '$lib/components/chat/AvatarWrapper.svelte';
   import { settings } from '$lib/stores';
 
   export let ttsApi: string = 'http://localhost:8000/api/v1';
@@ -11,8 +10,6 @@
   export let avatar: string = 'The Coach';
   export let element: HTMLElement | null = null;
   export let context: string = '';
-  export let mode: string = 'minimal';
-  export let minimized: boolean = false;
 
   let currentMessage = '';
   let speaking = false;
@@ -135,8 +132,6 @@
     if (opts.llmApi) llmApi = opts.llmApi;
     if (opts.voice) voice = opts.voice;
     if (opts.avatar) { avatar = opts.avatar; (settings as any).set({ selectedAvatarId: avatar }); }
-    if (opts.mode) mode = opts.mode;
-    if (opts.minimized !== undefined) minimized = opts.minimized === 'true';
   }
 
   // ── Handle AvatarChat events ──
@@ -151,32 +146,18 @@
   }
 </script>
 
-<div class="sa-root" class:sa-minimal={mode === 'minimal'}>
-  {#if mode === 'widget'}
-    <AvatarWrapper bind:minimized>
-      {#key avatar}
-        <AvatarChat
-          {currentMessage}
-          {speaking}
-          useClassroom={false}
-          on:speechend={handleSpeechEnd}
-        />
-      {/key}
-    </AvatarWrapper>
-  {:else}
-    {#key avatar}
-      <AvatarChat
-        {currentMessage}
-        {speaking}
-        useClassroom={false}
-        on:speechend={handleSpeechEnd}
-      />
-    {/key}
-  {/if}
+<div class="sa-root">
+  {#key avatar}
+    <AvatarChat
+      {currentMessage}
+      {speaking}
+      useClassroom={false}
+      on:speechend={handleSpeechEnd}
+    />
+  {/key}
 </div>
 
 <style>
   .sa-root { width: 100%; height: 100%; position: relative; }
-  .sa-root.sa-minimal { width: 100%; height: 100%; }
   .sa-root :global(canvas) { width: 100% !important; height: 100% !important; }
 </style>
