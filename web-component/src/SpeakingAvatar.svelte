@@ -24,6 +24,9 @@
   onMount(() => {
     (settings as any).set({ selectedAvatarId: avatar });
     (window as any).__SPEAKING_AVATAR_API__ = ttsApi.replace('/api/v1', '');
+    // Set static base URL for GLB files (CDN or dev server)
+    (window as any).__AVATAR_STATIC_BASE__ =
+      (window as any).__AVATAR_STATIC_BASE__ || '';
     window.addEventListener('avatar-viseme', _onViseme);
   });
 
