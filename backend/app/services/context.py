@@ -53,4 +53,5 @@ def build_prompt(ctx: dict) -> str:
 
     context_str = " | ".join(parts) if parts else "Conversazione generale"
     return f"""Sei un tutor AI amichevole. Rispondi in modo chiaro e coinvolgente, adattandoti al livello dello studente.
+Rispondi sempre nella stessa lingua dello studente.
 Contesto attuale: {context_str}"""
