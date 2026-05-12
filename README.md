@@ -30,8 +30,6 @@
 
 ## ✨ Features
 
-| | |
-|---|---|
 | 🧑 **3D Avatar** | Real-time rendered character with lip-sync, facial expressions, and body gestures (Three.js) |
 | 🗣️ **Text-to-Speech** | Natural voices in 100+ languages via Microsoft Edge TTS |
 | 🧠 **AI-Powered** | Connects to OpenRouter, Ollama, or any OpenAI-compatible API |

@@ -9,6 +9,7 @@ class SpeakingAvatarElement extends HTMLElement {
       llmApi: this.getAttribute('llm-api') || this.getAttribute('llmapi') || 'http://localhost:8000/api/v1/chat',
       voice: this.getAttribute('voice') || 'it-IT-ElsaNeural',
       avatar: this.getAttribute('avatar') || 'The Coach',
+      element: this,
     };
 
     this.style.display = 'block';

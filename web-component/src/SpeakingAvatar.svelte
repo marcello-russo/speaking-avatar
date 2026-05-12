@@ -1,34 +1,52 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import AvatarChat from '$lib/components/chat/AvatarChat.svelte';
   import { settings } from '$lib/stores';
-
-  const dispatch = createEventDispatcher();
 
   export let ttsApi: string = 'http://localhost:8000/api/v1';
   export let sttApi: string = 'http://localhost:8000/api/v1/stt';
   export let llmApi: string = 'http://localhost:8000/api/v1/chat';
   export let voice: string = 'it-IT-ElsaNeural';
   export let avatar: string = 'The Coach';
+  export let element: HTMLElement | null = null;
 
   let currentMessage = '';
   let speaking = false;
-  let _speakResolve: (() => void) | null = null;
+  let _speakResolve: ((value: void | PromiseLike<void>) => void) | null = null;
+  let _speakReject: ((reason?: any) => void) | null = null;
 
-  (settings as any).set({ selectedAvatarId: avatar });
+  function emit(type: string, detail: any) {
+    if (element) {
+      element.dispatchEvent(new CustomEvent(type, { detail, bubbles: false }));
+    }
+  }
 
   onMount(() => {
+    (settings as any).set({ selectedAvatarId: avatar });
     (window as any).__SPEAKING_AVATAR_API__ = ttsApi.replace('/api/v1', '');
+    window.addEventListener('avatar-viseme', _onViseme);
   });
+
+  onDestroy(() => {
+    window.removeEventListener('avatar-viseme', _onViseme);
+  });
+
+  function _onViseme(e: Event) {
+    const ce = e as CustomEvent;
+    emit('viseme', ce.detail);
+  }
 
   // ── Public API (exported functions) ──
 
   export async function speak(text: string): Promise<void> {
-    return new Promise((resolve) => {
+    // Resolve any pending speak promise
+    if (_speakResolve) { _speakResolve(); _speakResolve = null; _speakReject = null; }
+    return new Promise((resolve, reject) => {
       currentMessage = text;
       speaking = true;
       _speakResolve = resolve;
-      dispatch('speechstart', { text });
+      _speakReject = reject;
+      emit('speechstart', { text });
     });
   }
 
@@ -37,7 +55,7 @@
     form.append('audio', audio);
     const res = await fetch(sttApi, { method: 'POST', body: form });
     if (!res.ok) {
-      dispatch('error', { error: 'STT failed', source: 'stt' });
+      emit('error', { error: 'STT failed: ' + res.status, source: 'stt' });
       throw new Error('STT failed: ' + res.status);
     }
     const data = await res.json();
@@ -51,7 +69,7 @@
       body: JSON.stringify({ message }),
     });
     if (!res.ok) {
-      dispatch('error', { error: 'LLM failed', source: 'llm' });
+      emit('error', { error: 'LLM failed', source: 'llm' });
       throw new Error('LLM failed: ' + res.status);
     }
     const data = await res.json();
@@ -70,10 +88,11 @@
   // ── Handle AvatarChat events ──
   function handleSpeechEnd() {
     speaking = false;
-    dispatch('speechend', { text: currentMessage });
+    emit('speechend', { text: currentMessage });
     if (_speakResolve) {
       _speakResolve();
       _speakResolve = null;
+      _speakReject = null;
     }
   }
 </script>
