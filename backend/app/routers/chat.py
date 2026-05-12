@@ -1,17 +1,14 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-import json, httpx, os
+import json, httpx
 
 from app.models import ChatRequest, ChatResponse
 from app.services.context import parse_context, build_prompt
-from app.services.llm import chat, _fallback
+from app.services.llm import chat, _fallback, LLM_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 
 router = APIRouter()
 
 sessions: dict[str, list] = {}
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
 # ── Non-streaming ────────────────────────────────────
 
@@ -35,6 +32,23 @@ async def handle_chat(req: ChatRequest):
 
 # ── Streaming ────────────────────────────────────────
 
+def _get_stream_config():
+    """Return (url, headers, model) for the current LLM_PROVIDER."""
+    if LLM_PROVIDER == "openai":
+        return (
+            f"{OPENAI_BASE_URL.rstrip('/')}/chat/completions",
+            {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            OPENAI_MODEL,
+        )
+    elif LLM_PROVIDER == "openrouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
+            OPENROUTER_MODEL,
+        )
+    return (None, None, None)
+
+
 @router.post("/chat/stream")
 async def handle_chat_stream(req: ChatRequest):
     ctx = parse_context(req.context)
@@ -47,45 +61,48 @@ async def handle_chat_stream(req: ChatRequest):
 
     async def event_stream():
         full_reply = ""
-        try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                async with client.stream(
-                    "POST",
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": OPENROUTER_MODEL,
-                        "messages": [
-                            {"role": "system", "content": prompt},
-                            *history[-6:],
-                            {"role": "user", "content": req.message},
-                        ],
-                        "stream": True,
-                    },
-                ) as resp:
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: ") and line[6:] != "[DONE]":
-                            try:
-                                chunk = json.loads(line[6:])
-                                delta = chunk.get("choices", [{}])[0].get("delta", {})
-                                token = delta.get("content", "")
-                                if token:
-                                    full_reply += token
-                                    yield f"data: {json.dumps({'token': token})}\n\n"
-                            except json.JSONDecodeError:
-                                pass
-        except Exception:
-            yield f"data: {json.dumps({'token': _fallback(req.message)})}\n\n"
+
+        url, headers, model = _get_stream_config()
+        if url and headers.get("Authorization") != "Bearer ":
+            try:
+                async with httpx.AsyncClient(timeout=120) as client:
+                    async with client.stream(
+                        "POST", url,
+                        headers=headers,
+                        json={
+                            "model": model,
+                            "messages": [
+                                {"role": "system", "content": prompt},
+                                *history[-6:],
+                                {"role": "user", "content": req.message},
+                            ],
+                            "stream": True,
+                        },
+                    ) as resp:
+                        async for line in resp.aiter_lines():
+                            if line.startswith("data: ") and line[6:] != "[DONE]":
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                    if token:
+                                        full_reply += token
+                                        yield f"data: {json.dumps({'token': token})}\n\n"
+                                except json.JSONDecodeError:
+                                    pass
+            except Exception:
+                pass
+
+        if not full_reply:
+            # Fallback: non-streaming response as a single token
+            reply = await chat(req.message, ctx, history)
+            full_reply = reply
+            yield f"data: {json.dumps({'token': reply})}\n\n"
 
         # Save to history
-        if full_reply:
-            history.append({"role": "user", "content": req.message})
-            history.append({"role": "assistant", "content": full_reply})
-            if len(history) > 50:
-                history[:] = history[-50:]
+        history.append({"role": "user", "content": req.message})
+        history.append({"role": "assistant", "content": full_reply})
+        if len(history) > 50:
+            history[:] = history[-50:]
 
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 
