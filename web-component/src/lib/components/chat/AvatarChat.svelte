@@ -1360,7 +1360,48 @@
 		}
 	}
 
+	function sanitizeForTTS(text) {
+		return text
+			// Remove bold/italic markdown: **text** or *text*
+			.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+			// Remove inline code: `text`
+			.replace(/`([^`]+)`/g, '$1')
+			// Remove headings: # Heading
+			.replace(/^#{1,6}\s+/gm, '')
+			// Remove bullet lists: - or * at line start
+			.replace(/^[\s]*[-*+]\s+/gm, '')
+			// Remove numbered lists: 1. 2. etc
+			.replace(/^\s*\d+\.\s+/gm, '')
+			// Remove blockquotes: >
+			.replace(/^>\s+/gm, '')
+			// Remove horizontal rules
+			.replace(/^[-*_]{3,}\s*$/gm, '')
+			// Remove links: [text](url) -> text
+			.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+			// Remove standalone URLs
+			.replace(/https?:\/\/[^\s]+/g, '')
+			// Remove code blocks
+			.replace(/```[\s\S]*?```/g, '')
+			// Remove emoji characters
+			.replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+			.replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+			.replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+			.replace(/[\u{2600}-\u{26FF}]/gu, '')
+			.replace(/[\u{2700}-\u{27BF}]/gu, '')
+			.replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+			.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+			.replace(/[\u{231A}-\u{231B}]/gu, '')
+			.replace(/[\u{23E9}-\u{23F3}]/gu, '')
+			.replace(/[\u{23F8}-\u{23FA}]/gu, '')
+			.replace(/[\u{25AA}-\u{25AB}]/gu, '')
+			.replace(/[\u{25FB}-\u{25FE}]/gu, '')
+			// Collapse multiple spaces/newlines
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
 	function speakText(text: string) {
+		text = sanitizeForTTS(text);
 		resetVisemes();
 		resetGestures();
 		createVisemeSequence(text);

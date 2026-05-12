@@ -6,10 +6,12 @@ class SpeakingAvatarElement extends HTMLElement {
     const props = {
       ttsApi: this.getAttribute('tts-api') || this.getAttribute('ttsapi') || 'http://localhost:8000/api/v1',
       sttApi: this.getAttribute('stt-api') || this.getAttribute('sttapi') || 'http://localhost:8000/api/v1/stt',
-      llmApi: this.getAttribute('llm-api') || this.getAttribute('llmapi') || 'http://localhost:8000/api/v1/chat',
+      llmApi: this.getAttribute('llm-api') || this.getAttribute('llmapi') || 'http://localhost:8000/api/v1/chat/stream',
       voice: this.getAttribute('voice') || 'it-IT-ElsaNeural',
       avatar: this.getAttribute('avatar') || 'The Coach',
       context: this.getAttribute('context') || '',
+      mode: this.getAttribute('mode') || 'minimal',
+      minimized: this.getAttribute('minimized') === 'true',
       element: this,
     };
 
