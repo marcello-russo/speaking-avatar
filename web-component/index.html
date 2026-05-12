@@ -2,14 +2,87 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Speaking Avatar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Speaking Avatar — Demo</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #f8f9fc; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; height: 100vh; background: #f8f9fc; }
+    #avatar-panel { flex: 1; position: relative; }
+    #controls { width: 360px; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; background: white; border-left: 1px solid #e2e8f0; overflow-y: auto; }
+    #controls h2 { margin: 0; font-size: 1.25rem; }
+    #controls label { font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
+    textarea { padding: 0.5rem; font-size: 0.875rem; border-radius: 8px; border: 1px solid #cbd5e1; resize: vertical; font-family: inherit; }
+    button { padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; }
+    button:hover { opacity: 0.85; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-secondary { background: #f1f3f8; color: #1e293b; border: 1px solid #e2e8f0; }
+    #log { font-size: 0.75rem; color: #64748b; max-height: 200px; overflow-y: auto; font-family: monospace; background: #f8f9fc; border-radius: 8px; padding: 0.5rem; border: 1px solid #e2e8f0; }
+    #log div { padding: 2px 0; }
+    .event-start { color: #22c55e; }
+    .event-end { color: #6366f1; }
+    .event-error { color: #ef4444; }
   </style>
 </head>
 <body>
-  <speaking-avatar context="General" theme="light" accent="#6366f1"></speaking-avatar>
+  <div id="avatar-panel">
+    <speaking-avatar id="tutor"></speaking-avatar>
+  </div>
+  <div id="controls">
+    <h2>Speaking Avatar Demo</h2>
+
+    <label>Text to speak</label>
+    <textarea id="text-input" rows="3">Ciao! Oggi studiamo le equazioni di secondo grado.</textarea>
+
+    <button id="btn-speak" class="btn-primary">🗣️ Speak</button>
+    <button id="btn-ask" class="btn-primary">🤖 Ask AI</button>
+    <button id="btn-config" class="btn-secondary">⚙️ Switch to The Scholar</button>
+
+    <label>Events log</label>
+    <div id="log"></div>
+    <div style="display:flex;gap:0.5rem;font-size:0.75rem;color:#64748b;">
+      <span>🟢 = speech start</span>
+      <span>🔵 = speech end</span>
+      <span>🔴 = error</span>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
+  <script>
+    const tutor = document.getElementById('tutor');
+    const input = document.getElementById('text-input');
+    const log = document.getElementById('log');
+
+    function logMsg(msg, cls = '') {
+      const d = document.createElement('div');
+      d.textContent = '> ' + msg;
+      if (cls) d.className = cls;
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    document.getElementById('btn-speak').onclick = async () => {
+      logMsg('Speaking: "' + input.value.slice(0, 50) + '..."');
+      await tutor.speak(input.value);
+      logMsg('Done speaking', 'event-end');
+    };
+
+    document.getElementById('btn-ask').onclick = async () => {
+      logMsg('Asking AI...');
+      try {
+        const reply = await tutor.ask(input.value);
+        logMsg('AI replied: "' + reply.slice(0, 60) + '..."', 'event-end');
+      } catch (e) {
+        logMsg('AI error: ' + e.message, 'event-error');
+      }
+    };
+
+    document.getElementById('btn-config').onclick = () => {
+      tutor.configure({ avatar: 'The Scholar' });
+      logMsg('Switched to The Scholar avatar');
+    };
+
+    tutor.addEventListener('speechstart', (e) => logMsg('Start: "' + e.detail.text.slice(0, 30) + '..."', 'event-start'));
+    tutor.addEventListener('speechend', (e) => logMsg('End', 'event-end'));
+    tutor.addEventListener('error', (e) => logMsg('Error: ' + e.detail.error + ' (' + e.detail.source + ')', 'event-error'));
+  </script>
 </body>
 </html>
