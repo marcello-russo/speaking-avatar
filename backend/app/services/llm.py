@@ -12,6 +12,7 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 
 async def chat(message: str, ctx: dict, history: list | None = None) -> str:
@@ -93,11 +94,13 @@ async def _anthropic(message: str, prompt: str, history: list | None = None, ctx
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
+                f"{ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages",
                 headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
-                json={"model": ANTHROPIC_MODEL, "system": system, "messages": messages_list, "max_tokens": 2048},
+                json={"model": ANTHROPIC_MODEL, "system": system, "messages": messages_list, "max_tokens": 4096},
             )
             data = resp.json()
+            if "error" in data:
+                return _fallback(message, ctx)
             return data["content"][0]["text"]
     except Exception:
         return _fallback(message, ctx)
