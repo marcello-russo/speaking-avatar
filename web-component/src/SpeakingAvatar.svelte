@@ -1,20 +1,24 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import AvatarChat from '$lib/components/chat/AvatarChat.svelte';
+  import AvatarWrapper from '$lib/components/chat/AvatarWrapper.svelte';
   import { settings } from '$lib/stores';
 
   export let ttsApi: string = 'http://localhost:8000/api/v1';
   export let sttApi: string = 'http://localhost:8000/api/v1/stt';
-  export let llmApi: string = 'http://localhost:8000/api/v1/chat';
+  export let llmApi: string = 'http://localhost:8000/api/v1/chat/stream';
   export let voice: string = 'it-IT-ElsaNeural';
   export let avatar: string = 'The Coach';
   export let element: HTMLElement | null = null;
   export let context: string = '';
+  export let mode: string = 'minimal';
+  export let minimized: boolean = false;
 
   let currentMessage = '';
   let speaking = false;
   let _speakResolve: ((value: void | PromiseLike<void>) => void) | null = null;
   let _speakReject: ((reason?: any) => void) | null = null;
+  let _lastSpokenLen = 0;
 
   function emit(type: string, detail: any) {
     if (element) {
@@ -76,9 +80,53 @@
       emit('error', { error: 'LLM failed', source: 'llm' });
       throw new Error('LLM failed: ' + res.status);
     }
-    const data = await res.json();
-    await speak(data.reply);
-    return data.reply;
+
+    _lastSpokenLen = 0;
+    let full = '';
+    const reader = res.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (reader) {
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const ev = JSON.parse(data);
+              if (ev.token) {
+                full += ev.token;
+                currentMessage = full;
+                // Start speaking after first complete sentence or 40 chars
+                if (!speaking && (full.includes('.') || full.includes('!') || full.includes('?') || full.length > 40)) {
+                  speakEarly(full);
+                }
+              }
+              if (ev.done) break;
+            } catch { /* skip parse errors */ }
+          }
+        }
+      }
+    }
+
+    // If we haven't started speaking yet, speak the whole thing
+    if (!speaking && full) {
+      await speak(full);
+    }
+
+    return full;
+  }
+
+  function speakEarly(text: string) {
+    _lastSpokenLen = text.length;
+    speak(text);
   }
 
   export function configure(opts: Record<string, string>): void {
@@ -87,6 +135,8 @@
     if (opts.llmApi) llmApi = opts.llmApi;
     if (opts.voice) voice = opts.voice;
     if (opts.avatar) { avatar = opts.avatar; (settings as any).set({ selectedAvatarId: avatar }); }
+    if (opts.mode) mode = opts.mode;
+    if (opts.minimized !== undefined) minimized = opts.minimized === 'true';
   }
 
   // ── Handle AvatarChat events ──
@@ -101,18 +151,32 @@
   }
 </script>
 
-<div class="sa-root">
-  {#key avatar}
-    <AvatarChat
-      {currentMessage}
-      {speaking}
-      useClassroom={false}
-      on:speechend={handleSpeechEnd}
-    />
-  {/key}
+<div class="sa-root" class:sa-minimal={mode === 'minimal'}>
+  {#if mode === 'widget'}
+    <AvatarWrapper bind:minimized>
+      {#key avatar}
+        <AvatarChat
+          {currentMessage}
+          {speaking}
+          useClassroom={false}
+          on:speechend={handleSpeechEnd}
+        />
+      {/key}
+    </AvatarWrapper>
+  {:else}
+    {#key avatar}
+      <AvatarChat
+        {currentMessage}
+        {speaking}
+        useClassroom={false}
+        on:speechend={handleSpeechEnd}
+      />
+    {/key}
+  {/if}
 </div>
 
 <style>
   .sa-root { width: 100%; height: 100%; position: relative; }
+  .sa-root.sa-minimal { width: 100%; height: 100%; }
   .sa-root :global(canvas) { width: 100% !important; height: 100% !important; }
 </style>
