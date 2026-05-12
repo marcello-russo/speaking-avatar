@@ -1530,6 +1530,13 @@
 				const index = headMesh.morphTargetDictionary[currentVisemeObj.viseme];
 				headMesh.morphTargetInfluences[index] = 1.0;
 			}
+
+			// Surface viseme event for parent components
+			if (typeof window !== 'undefined') {
+				window.dispatchEvent(new CustomEvent('avatar-viseme', {
+					detail: { viseme: currentVisemeObj.viseme, duration: currentVisemeObj.duration }
+				}));
+			}
 		}
 
 		// Schedule next viseme
