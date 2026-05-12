@@ -4,7 +4,7 @@ import json, httpx
 
 from app.models import ChatRequest, ChatResponse
 from app.services.context import parse_context, build_prompt
-from app.services.llm import chat, _fallback, LLM_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
+from app.services.llm import chat, _fallback, LLM_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL
 
 router = APIRouter()
 
@@ -33,20 +33,29 @@ async def handle_chat(req: ChatRequest):
 # ── Streaming ────────────────────────────────────────
 
 def _get_stream_config():
-    """Return (url, headers, model) for the current LLM_PROVIDER."""
+    """Return (url, headers, model, is_anthropic) for the current LLM_PROVIDER."""
     if LLM_PROVIDER == "openai":
         return (
             f"{OPENAI_BASE_URL.rstrip('/')}/chat/completions",
             {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
             OPENAI_MODEL,
+            False,
         )
     elif LLM_PROVIDER == "openrouter":
         return (
             "https://openrouter.ai/api/v1/chat/completions",
             {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
             OPENROUTER_MODEL,
+            False,
         )
-    return (None, None, None)
+    elif LLM_PROVIDER == "anthropic":
+        return (
+            f"{ANTHROPIC_BASE_URL.rstrip('/')}/v1/messages",
+            {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
+            ANTHROPIC_MODEL,
+            True,
+        )
+    return (None, None, None, False)
 
 
 @router.post("/chat/stream")
@@ -62,33 +71,63 @@ async def handle_chat_stream(req: ChatRequest):
     async def event_stream():
         full_reply = ""
 
-        url, headers, model = _get_stream_config()
-        if url and headers.get("Authorization") != "Bearer ":
+        url, headers, model, is_anthropic = _get_stream_config()
+        has_key = any(v for v in headers.values() if v.startswith("Bearer ") or len(v) > 10)
+        if url and has_key:
             try:
+                if is_anthropic:
+                    body = {
+                        "model": model,
+                        "system": prompt,
+                        "messages": [
+                            *history[-6:],
+                            {"role": "user", "content": req.message},
+                        ],
+                        "stream": True,
+                        "max_tokens": 4096,
+                    }
+                else:
+                    body = {
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": prompt},
+                            *history[-6:],
+                            {"role": "user", "content": req.message},
+                        ],
+                        "stream": True,
+                    }
+
                 async with httpx.AsyncClient(timeout=120) as client:
-                    async with client.stream(
-                        "POST", url,
-                        headers=headers,
-                        json={
-                            "model": model,
-                            "messages": [
-                                {"role": "system", "content": prompt},
-                                *history[-6:],
-                                {"role": "user", "content": req.message},
-                            ],
-                            "stream": True,
-                        },
-                    ) as resp:
-                        async for line in resp.aiter_lines():
-                            if line.startswith("data: ") and line[6:] != "[DONE]":
-                                try:
-                                    chunk = json.loads(line[6:])
-                                    token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if token:
-                                        full_reply += token
-                                        yield f"data: {json.dumps({'token': token})}\n\n"
-                                except json.JSONDecodeError:
-                                    pass
+                    async with client.stream("POST", url, headers=headers, json=body) as resp:
+                        if is_anthropic:
+                            # Anthropic SSE format: event + data lines
+                            pending_event = ""
+                            async for line in resp.aiter_lines():
+                                if line.startswith("event: "):
+                                    pending_event = line[7:]
+                                elif line.startswith("data: ") and pending_event == "content_block_delta":
+                                    try:
+                                        chunk = json.loads(line[6:])
+                                        dd = chunk.get("delta", {})
+                                        if dd.get("type") == "text_delta":
+                                            token = dd.get("text", "")
+                                            if token:
+                                                full_reply += token
+                                                yield f"data: {json.dumps({'token': token})}\n\n"
+                                    except json.JSONDecodeError:
+                                        pass
+                        else:
+                            # OpenAI / OpenRouter SSE format
+                            async for line in resp.aiter_lines():
+                                if line.startswith("data: ") and line[6:] != "[DONE]":
+                                    try:
+                                        chunk = json.loads(line[6:])
+                                        token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                        if token:
+                                            full_reply += token
+                                            yield f"data: {json.dumps({'token': token})}\n\n"
+                                    except json.JSONDecodeError:
+                                        pass
             except Exception:
                 pass
 
