@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+
 from app.models import ChatRequest, ChatResponse
 from app.services.context import parse_context
 from app.services.llm import chat
@@ -6,6 +7,7 @@ from app.services.llm import chat
 router = APIRouter()
 
 sessions: dict[str, list] = {}
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def handle_chat(req: ChatRequest):
