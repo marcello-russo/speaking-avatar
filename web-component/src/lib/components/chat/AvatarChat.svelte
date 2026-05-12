@@ -22,8 +22,9 @@
 	let renderer: THREE.WebGLRenderer;
 
 	function staticUrl(path: string): string {
-		const base = (window as any).__AVATAR_STATIC_BASE__ || '';
-		return base + path;
+		const base = ((window as any).__AVATAR_STATIC_BASE__ || '').replace(/\/+$/, '');
+		const cleanPath = path.replace(/^\/+/, '');
+		return base ? base + '/' + cleanPath : '/' + cleanPath;
 	}
 	let controls: OrbitControls;
 	let avatar: THREE.Object3D;
