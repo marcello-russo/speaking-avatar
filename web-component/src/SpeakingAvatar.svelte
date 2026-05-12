@@ -9,6 +9,7 @@
   export let voice: string = 'it-IT-ElsaNeural';
   export let avatar: string = 'The Coach';
   export let element: HTMLElement | null = null;
+  export let context: string = '';
 
   let currentMessage = '';
   let speaking = false;
@@ -69,7 +70,7 @@
     const res = await fetch(llmApi, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, context }),
     });
     if (!res.ok) {
       emit('error', { error: 'LLM failed', source: 'llm' });
