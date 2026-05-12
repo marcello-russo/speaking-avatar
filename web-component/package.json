@@ -1,6 +1,6 @@
 {
   "name": "speaking-avatar",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "type": "module",
   "private": false,
   "description": "Open source 3D speaking avatar web component. Zero UI — just a 3D face with voice.",
