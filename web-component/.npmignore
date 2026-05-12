@@ -1,0 +1,6 @@
+src/
+node_modules/
+public/
+vite.config.js
+svelte.config.js
+jsconfig.json
