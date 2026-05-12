@@ -20,6 +20,11 @@
 	let scene: THREE.Scene;
 	let camera: THREE.PerspectiveCamera;
 	let renderer: THREE.WebGLRenderer;
+
+	function staticUrl(path: string): string {
+		const base = (window as any).__AVATAR_STATIC_BASE__ || '';
+		return base + path;
+	}
 	let controls: OrbitControls;
 	let avatar: THREE.Object3D;
 	let headMesh: any; // For accessing morph targets
@@ -247,7 +252,7 @@
 
 		// Load selected avatar model from static/avatar directory
 		// This uses the ID from user preferences to load the appropriate GLB file
-		const avatarPath = `/static/avatar/${selectedAvatarId}.glb`;
+		const avatarPath = staticUrl(`/static/avatar/${selectedAvatarId}.glb`);
 		console.log(`Loading avatar from: ${avatarPath}`);
 		await loadAvatar(avatarPath);
 
@@ -1952,10 +1957,10 @@
 		}
 
 		// Fix the path construction to ensure correct URL format
-		// Always use absolute path from the site root
-		const fullPath = animationPath.startsWith('/')
-			? animationPath // Keep the leading slash for absolute paths
-			: '/' + animationPath; // Add leading slash for relative paths
+		const normalized = animationPath.startsWith('/')
+			? animationPath
+			: '/' + animationPath;
+		const fullPath = staticUrl(normalized);
 
 		console.log(`Full animation path: ${fullPath}`);
 
