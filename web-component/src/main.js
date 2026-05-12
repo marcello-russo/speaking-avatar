@@ -3,25 +3,26 @@ import SpeakingAvatar from './SpeakingAvatar.svelte';
 
 class SpeakingAvatarElement extends HTMLElement {
   connectedCallback() {
-    const context = this.getAttribute('context') || '';
-    const theme = this.getAttribute('theme') || 'light';
-    const accent = this.getAttribute('accent') || '#6366f1';
-    const apiurl = this.getAttribute('apiurl') || 'http://localhost:8000/api/v1';
-    const avatar = this.getAttribute('avatar') || 'The Coach';
-    const title = this.getAttribute('title') || 'AI Tutor';
-    const fab = this.getAttribute('fab') || 'true';
+    const props = {
+      ttsApi: this.getAttribute('tts-api') || this.getAttribute('ttsapi') || 'http://localhost:8000/api/v1',
+      sttApi: this.getAttribute('stt-api') || this.getAttribute('sttapi') || 'http://localhost:8000/api/v1/stt',
+      llmApi: this.getAttribute('llm-api') || this.getAttribute('llmapi') || 'http://localhost:8000/api/v1/chat',
+      voice: this.getAttribute('voice') || 'it-IT-ElsaNeural',
+      avatar: this.getAttribute('avatar') || 'The Coach',
+    };
 
     this.style.display = 'block';
-    this.style.width = '100vw';
-    this.style.height = '100vh';
+    this.style.width = '100%';
+    this.style.height = '100%';
 
-    mount(SpeakingAvatar, {
-      target: this,
-      props: { context, theme, accent, apiurl, avatar, title, fab },
-    });
+    const inst = mount(SpeakingAvatar, { target: this, props });
+
+    this.speak = inst.speak;
+    this.listen = inst.listen;
+    this.ask = inst.ask;
+    this.configure = inst.configure;
   }
 }
 
 customElements.define('speaking-avatar', SpeakingAvatarElement);
-
 export default SpeakingAvatarElement;
