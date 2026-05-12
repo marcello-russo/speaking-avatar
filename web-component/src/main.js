@@ -10,8 +10,6 @@ class SpeakingAvatarElement extends HTMLElement {
       voice: this.getAttribute('voice') || 'it-IT-ElsaNeural',
       avatar: this.getAttribute('avatar') || 'The Coach',
       context: this.getAttribute('context') || '',
-      mode: this.getAttribute('mode') || 'minimal',
-      minimized: this.getAttribute('minimized') === 'true',
       element: this,
     };
 
