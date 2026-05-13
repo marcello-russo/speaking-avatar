@@ -1,7 +1,7 @@
 <div align="center">
   <h1>🎙️ Speaking Avatar</h1>
   <p><strong>Open source 3D speaking avatar microservice.</strong><br>
-  Drop-in web component for AI-powered conversational interfaces.</p>
+  Zero-UI web component — bring your own chat interface.</p>
 
   <p>
     <a href="https://github.com/marcello-russo/speaking-avatar/stargazers">
@@ -12,17 +12,13 @@
     </a>
     <img src="https://img.shields.io/badge/3D-Three.js-purple?style=flat-square" alt="Three.js">
     <img src="https://img.shields.io/badge/TTS-Edge%20AI-blue?style=flat-square" alt="Edge TTS">
-    <img src="https://img.shields.io/badge/LLM-OpenRouter%2FOllama-green?style=flat-square" alt="LLM">
+    <img src="https://img.shields.io/badge/LLM-Anthropic%2FOpenAI%2FOllama-green?style=flat-square" alt="LLM">
     <img src="https://img.shields.io/badge/Web_Component-Svelte-orange?style=flat-square" alt="Web Component">
   </p>
 
-  <img src="https://placehold.co/800x400/6366f1/white?text=3D+Speaking+Avatar" width="600" alt="demo">
-
-  <br>
-
   ```html
-  <script type="module" src="speaking-avatar.js"></script>
-  <speaking-avatar context="Mathematics" accent="#6366f1"></speaking-avatar>
+  <script src="speaking-avatar.umd.js"></script>
+  <speaking-avatar></speaking-avatar>
   ```
 </div>
 
@@ -31,159 +27,122 @@
 ## ✨ Features
 
 | 🧑 **3D Avatar** | Real-time rendered character with lip-sync, facial expressions, and body gestures (Three.js) |
-| 🗣️ **Text-to-Speech** | Natural voices in 100+ languages via Microsoft Edge TTS |
-| 🧠 **AI-Powered** | Connects to OpenRouter, Ollama, or any OpenAI-compatible API |
-| 🧩 **Web Component** | Works in any framework — React, Vue, Angular, Moodle, WordPress, plain HTML |
-| 🎨 **Customizable** | Accent color, theme, avatar model, camera position, system prompt |
+| 🗣️ **Text-to-Speech** | Natural voices via Microsoft Edge TTS, progressive sentence-level streaming |
+| 🧠 **LLM agnostic** | Anthropic, OpenAI-compatible, OpenRouter, Ollama — plug any provider |
+| 🧩 **Zero-UI** | Pure avatar, no chat bubbles or FAB built-in. You build the interface, we render the face |
+| ⚡ **SSE streaming** | Token-by-token text + concurrent sentence-level audio in a single stream |
 | 🐳 **Docker** | `docker compose up` to run the full stack |
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (recommended — full stack)
+### Option 1: Docker (recommended)
 
 ```bash
 git clone https://github.com/marcello-russo/speaking-avatar
 cd speaking-avatar
 cp backend/.env.example backend/.env
-# Edit backend/.env → add your OPENROUTER_API_KEY
+# Edit backend/.env → add an LLM API key (see below)
 docker compose up -d
 ```
 
-Open **http://localhost:5173** → click 💬 to chat.
+Open **http://localhost:5173** — the avatar renders with a built-in demo UI.
 
-### Option 2: Import in your app (2 lines)
-
-```html
-<script type="module" src="http://localhost:5173/src/main.js"></script>
-<speaking-avatar context="Mathematics" accent="#6366f1"></speaking-avatar>
-```
-
-> The web component auto-registers. Just add the `<script>` tag and the `<speaking-avatar>` element anywhere in your HTML.
-
-### Option 3: Self-hosted build
+### Option 2: npm / CDN
 
 ```bash
-cd web-component
-npm run build
-npx serve dist    # or any static file server
+npm install speaking-avatar
 ```
 
 ```html
-<script src="https://your-cdn.com/speaking-avatar.umd.js"></script>
-<speaking-avatar context="Biology" theme="light"></speaking-avatar>
+<script src="https://cdn.jsdelivr.net/npm/speaking-avatar/dist/speaking-avatar.umd.js"></script>
+<speaking-avatar></speaking-avatar>
 ```
 
-## 📦 Integration
-
-The `<speaking-avatar>` web component works in any framework. Here's how to use it:
-
-### Vanilla HTML
-
-```html
-<!doctype html>
-<html>
-<head>
-  <script type="module" src="http://localhost:5173/src/main.js"></script>
-</head>
-<body>
-  <speaking-avatar context="Mathematics" theme="light"></speaking-avatar>
-</body>
-</html>
+```javascript
+const avatar = document.querySelector('speaking-avatar');
+avatar.speak('Hello!');           // TTS
+avatar.ask('What is gravity?');   // LLM + TTS
+avatar.listen(audioBlob);         // STT
+avatar.configure({ ttsApi: '...' });
 ```
 
-### React
+### Option 3: Dev server
 
-```jsx
-function App() {
-  useEffect(() => {
-    import('http://localhost:5173/src/main.js');
-  }, []);
-  return <speaking-avatar context="Physics" accent="#10b981" />;
-}
+```bash
+cd web-component && npm run dev     # :5173
+cd backend && uvicorn app.main:app  # :8000
 ```
 
-### Vue
-
-```vue
-<template>
-  <speaking-avatar context="Chemistry" theme="dark" />
-</template>
-<script setup>
-  onMounted(() => import('http://localhost:5173/src/main.js'));
-</script>
-```
-
-### Moodle (add as HTML block)
-
-In any course page, add a Custom HTML block:
-
-```html
-<a href="http://localhost:5173/?course=Mathematics" class="btn btn-primary" target="_blank">
-  🎓 Study with AI Tutor
-</a>
-```
-
-### Passing context (documents, files)
-
-```html
-<!-- Single context -->
-<speaking-avatar context="Linear Algebra - Chapter 3"></speaking-avatar>
-
-<!-- Multiple documents (URL-encoded JSON) -->
-<speaking-avatar
-  context='[{"title":"Chapter 1","url":"https://..."},{"title":"Notes","url":"https://..."}]'
-></speaking-avatar>
-```
-
-## 🎮 Props
+## ⚙️ Props
 
 | Prop | Default | Description |
 |------|---------|-------------|
-| `context` | `""` | Context passed to the AI (course name, topic, etc.) |
-| `theme` | `"light"` | `"light"` or `"dark"` |
-| `accent` | `"#6366f1"` | Accent color for UI elements |
-| `apiurl` | `"http://localhost:8000/api/v1"` | Backend API base URL |
-| `avatar` | `"The Coach"` | 3D avatar model: `The Coach`, `The Scholar`, `The Mentor`, `The Innovator` |
-| `title` | `"AI Tutor"` | Title shown in chat header |
-| `fab` | `"true"` | Show/hide the floating action button |
+| `tts-api` | `http://localhost:8000/api/v1` | TTS endpoint base URL |
+| `stt-api` | `http://localhost:8000/api/v1/stt` | STT endpoint |
+| `llm-api` | `http://localhost:8000/api/v1/chat/stream` | LLM streaming endpoint |
+| `voice` | `it-IT-ElsaNeural` | Edge TTS voice |
+| `avatar` | `The Coach` | 3D model: `The Coach`, `The Scholar`, `The Mentor`, `The Innovator` |
+| `context` | `""` | Course / lesson context passed to the LLM |
 
-## ⚙️ Backend API
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `speak(text)` | `Promise<void>` | Speak the given text via TTS |
+| `ask(message)` | `Promise<string>` | Send message to LLM via SSE, speak progressively, return full reply |
+| `listen(audio)` | `Promise<string>` | Transcribe audio via backend STT |
+| `configure(opts)` | `void` | Update props at runtime |
+
+### Events
+
+| Event | Detail | Description |
+|-------|--------|-------------|
+| `speechstart` | `{ text }` | Avatar started speaking |
+| `speechend` | `{ text }` | Avatar finished speaking |
+| `viseme` | `{ viseme, time }` | Lip-sync viseme event |
+| `error` | `{ error, source }` | Error from LLM, TTS, or STT |
+
+## 🏗️ Backend API
 
 | Route | Method | Description |
 |-------|--------|-------------|
 | `/api/v1/health` | `GET` | Health check |
-| `/api/v1/chat` | `POST` | Send a message to the AI |
-| `/api/v1/tts` | `POST` | Convert text to speech (returns MP3) |
+| `/api/v1/chat` | `POST` | Non-streaming chat (returns complete reply) |
+| `/api/v1/chat/stream` | `POST` | SSE streaming: `token` (text) + `audio_complete` (base64 MP3) events |
+| `/api/v1/tts` | `POST` | Text-to-speech (returns MP3 blob) |
+| `/api/v1/stt` | `POST` | Speech-to-text (Whisper or mock) |
 
-### Environment variables
+### SSE event types
+
+```
+event: token           {"type":"token","text":"Ciao"}
+event: audio_complete  {"type":"audio_complete","seq":0,"data":"<base64>","dur":1.2}
+event: done            {"type":"done","session_id":"..."}
+```
+
+Audio events include a `seq` counter — the frontend reorders them for correct playback.
+
+### Env vars
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENROUTER_API_KEY` | — | API key for OpenRouter (or any OpenAI-compatible provider) |
-| `OPENROUTER_MODEL` | `openai/gpt-4o-mini` | Model to use |
-| `SYSTEM_PROMPT` | Custom | System prompt for the AI |
-
-## 🏗️ Architecture
-
-```
-┌──────────────────────────────────────────┐
-│          <speaking-avatar>               │
-│  HTML Web Component                      │
-│  ├── Three.js 3D renderer               │
-│  ├── Edge TTS audio playback             │
-│  └── Floating chat UI                    │
-└─────────────────┬────────────────────────┘
-                  │ REST API
-┌─────────────────▼────────────────────────┐
-│          FastAPI Backend                 │
-│  /api/v1/chat  /api/v1/tts  /health     │
-│  OpenRouter / Ollama / any LLM API       │
-└──────────────────────────────────────────┘
-```
+| `LLM_PROVIDER` | `openrouter` | `anthropic` \| `openai` \| `openrouter` \| `ollama` |
+| `ANTHROPIC_API_KEY` | — | Anthropic API key or any Anthropic-compatible (e.g. GLM via `api.z.ai`) |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Custom endpoint for Anthropic-compatible providers |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Model name |
+| `OPENAI_API_KEY` | — | OpenAI / GLM / vLLM / Together / Groq API key |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom endpoint for OpenAI-compatible providers |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model name |
+| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `OPENROUTER_MODEL` | `openai/gpt-4o-mini` | Model name |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |
+| `OLLAMA_MODEL` | `llama3` | Model name |
+| `TTS_VOICE` | `it-IT-ElsaNeural` | Edge TTS voice |
+| `STT_ENGINE` | `mock` | `whisper` or `mock` |
 
 ## 🧑‍🎨 Custom Avatars
 
-The project includes 4 pre-built 3D avatars with full skeletal animation and facial visemes:
+4 pre-built 3D avatars with full skeletal animation and ARKit viseme morph targets:
 
 | Avatar | Personality |
 |--------|-------------|
@@ -192,33 +151,37 @@ The project includes 4 pre-built 3D avatars with full skeletal animation and fac
 | **The Mentor** | Encouraging, warm, supportive |
 | **The Innovator** | Creative, curious, thought-provoking |
 
-You can add custom GLB models — the engine supports any model with a compatible skeleton and viseme morph targets (ARKit standard).
+Add custom GLB models with ARKit-standard viseme morph targets.
 
 ## 🧪 Local Development
 
 ```bash
 # Backend
-cd backend
-pip install -r requirements.txt
+cd backend && pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
 # Web Component
-cd web-component
-npm install
-npm run dev
+cd web-component && npm install && npm run dev
 ```
+
+## Architecture
+
+```
+SSE stream ──► /chat/stream ──► LLM Provider
+                   │
+            ┌──────┴──────┐
+            │             │
+      event "token"   SentenceBuffer → TTS Pipeline
+      (text,            (word-aware     (Edge TTS,
+       immediate)       boundary,       concurrent,
+                        800ms timeout)  seq-numbered)
+                              │
+                        event "audio_complete"
+                        (base64 MP3 + seq + dur)
+```
+
+The LLM stream feeds a `SentenceBuffer` that emits complete sentences using adaptive boundary detection (primary `. ! ?`, forced at 80 chars, timeout at 800ms). Each sentence goes to the TTS pipeline which runs Edge TTS concurrently — audio events carry a `seq` field so the frontend can reorder them before playback.
 
 ## 📄 License
 
 MIT — use it anywhere, for anything.
-
----
-
-<div align="center">
-  <p>Built with ❤️ for open source AI</p>
-  <p>
-    <a href="https://github.com/marcello-russo/speaking-avatar/issues">Report a bug</a>
-    ·
-    <a href="https://github.com/marcello-russo/speaking-avatar/discussions">Discussion</a>
-  </p>
-</div>
