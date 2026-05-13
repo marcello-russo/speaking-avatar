@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 from app.services.sentence_buffer import SentenceBuffer
 
 
@@ -64,6 +65,43 @@ async def test_no_word_split_on_forced_emit():
     sb.push(" come")
     result = sb.push(" stai")
     assert result is not None
-    # Should not split "stai" — emit whole tokens only
     remaining = sb.flush()
     assert "stai" not in result or "stai" in remaining
+
+
+@pytest.mark.asyncio
+async def test_multi_sentence_order():
+    """Two complete sentences emitted in correct order."""
+    sb = SentenceBuffer(soglia_base=100)
+    tokens = " Ciao come stai ? Oggi studiamo le frane".split()
+    results = []
+    for t in tokens:
+        r = sb.push(t)
+        if r:
+            results.append(r)
+    r = sb.flush()
+    if r:
+        results.append(r)
+    assert len(results) == 2
+    assert "Ciao" in results[0]
+    assert "frane" in results[1]
+
+
+@pytest.mark.asyncio
+async def test_sentence_timeout_emits_in_order():
+    """Timeout should emit first complete chunk, rest stays."""
+    sb = SentenceBuffer(soglia_base=200, timeout_ms=50)
+    tokens = " Le frane sono molto pericolose Esempio".split()
+    results = []
+    for t in tokens:
+        r = sb.push(t)
+        if r:
+            results.append(r)
+        await asyncio.sleep(0.03)
+    r = sb.flush()
+    if r:
+        results.append(r)
+    assert len(results) >= 2
+    all_text = "".join(results)
+    assert "frane" in all_text
+    assert "Esempio" in all_text

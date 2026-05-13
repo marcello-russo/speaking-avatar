@@ -8,7 +8,7 @@ class TtsPipeline:
         self.voice = voice
         self.audio_queue = audio_queue
         self.cache = cache or AudioCache()
-        self._semaphore = asyncio.Semaphore(5)  # I/O-bound, più concorrenza = meglio
+        self._semaphore = asyncio.Semaphore(1)  # FIFO: ordine delle frasi preservato
         self._pending = 0
         self._all_done = asyncio.Event()
         self._all_done.set()
