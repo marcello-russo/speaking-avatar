@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-import json, httpx
+import json, httpx, asyncio
 
 from app.models import ChatRequest, ChatResponse
 from app.services.context import parse_context, build_prompt
 from app.services.llm import chat, _fallback, LLM_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL
+from app.services.sentence_buffer import SentenceBuffer
+from app.services.tts_pipeline import TtsPipeline
 
 router = APIRouter()
 
@@ -58,6 +60,95 @@ def _get_stream_config():
     return (None, None, None, False)
 
 
+async def _merge_iterators(*iters):
+    queue: asyncio.Queue = asyncio.Queue()
+    finished = 0
+    n = len(iters)
+
+    async def feed(it):
+        nonlocal finished
+        try:
+            async for item in it:
+                await queue.put(item)
+        finally:
+            finished += 1
+            if finished == n:
+                await queue.put(None)
+
+    tasks = [asyncio.create_task(feed(it)) for it in iters]
+    while True:
+        item = await queue.get()
+        if item is None:
+            break
+        yield item
+
+
+async def _token_stream(prompt, history, message, ctx):
+    url, headers, model, is_anthropic = _get_stream_config()
+    has_key = any(v for v in headers.values() if v.startswith("Bearer ") or len(v) > 10)
+    full_reply = ""
+
+    if url and has_key:
+        try:
+            if is_anthropic:
+                body = {
+                    "model": model,
+                    "system": prompt,
+                    "messages": [
+                        *history[-6:],
+                        {"role": "user", "content": message},
+                    ],
+                    "stream": True,
+                    "max_tokens": 4096,
+                }
+            else:
+                body = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": prompt},
+                        *history[-6:],
+                        {"role": "user", "content": message},
+                    ],
+                    "stream": True,
+                }
+
+            async with httpx.AsyncClient(timeout=120) as client:
+                async with client.stream("POST", url, headers=headers, json=body) as resp:
+                    if is_anthropic:
+                        pending_event = ""
+                        async for line in resp.aiter_lines():
+                            if line.startswith("event: "):
+                                pending_event = line[7:]
+                            elif line.startswith("data: ") and pending_event == "content_block_delta":
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    dd = chunk.get("delta", {})
+                                    if dd.get("type") == "text_delta":
+                                        token = dd.get("text", "")
+                                        if token:
+                                            full_reply += token
+                                            yield {"type": "token", "text": token}
+                                except json.JSONDecodeError:
+                                    pass
+                    else:
+                        async for line in resp.aiter_lines():
+                            if line.startswith("data: ") and line[6:] != "[DONE]":
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                    if token:
+                                        full_reply += token
+                                        yield {"type": "token", "text": token}
+                                except json.JSONDecodeError:
+                                    pass
+        except Exception:
+            pass
+
+    if not full_reply:
+        reply = await chat(message, ctx, history)
+        yield {"type": "token", "text": reply}
+
+
 @router.post("/chat/stream")
 async def handle_chat_stream(req: ChatRequest):
     ctx = parse_context(req.context)
@@ -69,79 +160,42 @@ async def handle_chat_stream(req: ChatRequest):
     history = sessions[session_id]
 
     async def event_stream():
+        sentence_buffer = SentenceBuffer()
+        audio_queue: asyncio.Queue = asyncio.Queue()
+        tts_pipeline = TtsPipeline(req.voice, audio_queue)
+
+        async def audio_drainer():
+            while True:
+                chunk = await audio_queue.get()
+                if chunk is None:
+                    break
+                yield chunk
+
         full_reply = ""
+        merged = _merge_iterators(
+            _token_stream(prompt, history, req.message, ctx),
+            audio_drainer(),
+        )
 
-        url, headers, model, is_anthropic = _get_stream_config()
-        has_key = any(v for v in headers.values() if v.startswith("Bearer ") or len(v) > 10)
-        if url and has_key:
-            try:
-                if is_anthropic:
-                    body = {
-                        "model": model,
-                        "system": prompt,
-                        "messages": [
-                            *history[-6:],
-                            {"role": "user", "content": req.message},
-                        ],
-                        "stream": True,
-                        "max_tokens": 4096,
-                    }
-                else:
-                    body = {
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": prompt},
-                            *history[-6:],
-                            {"role": "user", "content": req.message},
-                        ],
-                        "stream": True,
-                    }
+        async for event in merged:
+            if event["type"] == "token":
+                full_reply += event["text"]
+                frase = sentence_buffer.push(event["text"])
+                if frase:
+                    asyncio.create_task(tts_pipeline.enqueue(frase))
+                yield f"data: {json.dumps({'token': event['text']})}\n\n"
+            elif event["type"] == "audio":
+                yield f"data: {json.dumps(event)}\n\n"
 
-                async with httpx.AsyncClient(timeout=120) as client:
-                    async with client.stream("POST", url, headers=headers, json=body) as resp:
-                        if is_anthropic:
-                            # Anthropic SSE format: event + data lines
-                            pending_event = ""
-                            async for line in resp.aiter_lines():
-                                if line.startswith("event: "):
-                                    pending_event = line[7:]
-                                elif line.startswith("data: ") and pending_event == "content_block_delta":
-                                    try:
-                                        chunk = json.loads(line[6:])
-                                        dd = chunk.get("delta", {})
-                                        if dd.get("type") == "text_delta":
-                                            token = dd.get("text", "")
-                                            if token:
-                                                full_reply += token
-                                                yield f"data: {json.dumps({'token': token})}\n\n"
-                                    except json.JSONDecodeError:
-                                        pass
-                        else:
-                            # OpenAI / OpenRouter SSE format
-                            async for line in resp.aiter_lines():
-                                if line.startswith("data: ") and line[6:] != "[DONE]":
-                                    try:
-                                        chunk = json.loads(line[6:])
-                                        token = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                        if token:
-                                            full_reply += token
-                                            yield f"data: {json.dumps({'token': token})}\n\n"
-                                    except json.JSONDecodeError:
-                                        pass
-            except Exception:
-                pass
+        remainder = sentence_buffer.flush()
+        if remainder:
+            asyncio.create_task(tts_pipeline.enqueue(remainder))
 
-        if not full_reply:
-            # Fallback: non-streaming response as a single token
-            reply = await chat(req.message, ctx, history)
-            full_reply = reply
-            yield f"data: {json.dumps({'token': reply})}\n\n"
-
-        # Save to history
-        history.append({"role": "user", "content": req.message})
-        history.append({"role": "assistant", "content": full_reply})
-        if len(history) > 50:
-            history[:] = history[-50:]
+        if full_reply:
+            history.append({"role": "user", "content": req.message})
+            history.append({"role": "assistant", "content": full_reply})
+            if len(history) > 50:
+                history[:] = history[-50:]
 
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 
