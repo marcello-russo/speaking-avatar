@@ -191,6 +191,8 @@ async def handle_chat_stream(req: ChatRequest):
         if remainder:
             asyncio.create_task(tts_pipeline.enqueue(remainder))
 
+        await tts_pipeline.wait_for_all()
+
         if full_reply:
             history.append({"role": "user", "content": req.message})
             history.append({"role": "assistant", "content": full_reply})
