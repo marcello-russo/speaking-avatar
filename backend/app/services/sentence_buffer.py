@@ -18,16 +18,14 @@ class SentenceBuffer:
         if not token:
             return None
 
-        # Merge apostrophe tokens with previous word
         if token.startswith("'") and self._tokens:
             self._tokens[-1] += token
             return None
 
         if self._ready_to_emit:
-            result = self._emit_all_but_last()
+            result = self._emit()
             self._tokens.append(token)
             self._first_token_time = time.monotonic()
-            self._ready_to_emit = False
             return result
 
         self._tokens.append(token)
@@ -36,28 +34,27 @@ class SentenceBuffer:
         return self._check_and_emit()
 
     def _check_and_emit(self) -> Optional[str]:
-        full = " ".join(self._tokens)
+        full = "".join(self._tokens)
         last = self._tokens[-1] if self._tokens else ""
 
-        # Standalone punctuation → emit whole sentence
-        if last in (".", "!", "?"):
+        # Standalone punctuation token → emit immediately
+        last_stripped = last.strip() if self._tokens else ""
+        if last_stripped in (".", "!", "?"):
             return self._emit()
 
-        # Embedded punctuation in the accumulated text (not in last token)
-        if any(c in full[:-(len(last) + 1)] if len(last) < len(full) else False for c in ".!?"):
+        # Any punctuation in accumulated text → ready to emit at next push
+        if any(c in full for c in ".!?"):
             self._ready_to_emit = True
             return None
 
-        # Forced emit at word boundary (threshold + backpressure)
         threshold = self.soglia_base + (self._queue_depth * 30)
         if len(full) >= threshold:
-            return self._emit_at_word_boundary()
+            return self._emit_at_token_boundary()
 
-        # Timeout-based emit at word boundary
         if self._first_token_time is not None:
             elapsed = (time.monotonic() - self._first_token_time) * 1000
             if elapsed >= self.timeout_ms:
-                return self._emit_at_word_boundary()
+                return self._emit_at_token_boundary()
 
         return None
 
@@ -70,28 +67,25 @@ class SentenceBuffer:
         return self._queue_depth
 
     def _emit(self) -> str:
-        result = " ".join(self._tokens)
+        result = "".join(self._tokens)
         self._tokens.clear()
         self._first_token_time = None
         self._ready_to_emit = False
         return result
 
-    def _emit_all_but_last(self) -> str:
-        result = " ".join(self._tokens[:-1])
-        last = self._tokens[-1]
-        self._tokens = [last]
-        self._first_token_time = None
-        self._ready_to_emit = False
-        return result
-
-    def _emit_at_word_boundary(self) -> str:
-        full = " ".join(self._tokens)
-        space = full.rfind(" ")
-        if space <= 0:
+    def _emit_at_token_boundary(self) -> str:
+        threshold = self.soglia_base + (self._queue_depth * 30)
+        cum = 0
+        cut = len(self._tokens)
+        for i, tok in enumerate(self._tokens):
+            cum += len(tok)
+            if cum >= threshold and i >= 1:
+                cut = i
+                break
+        if cut >= len(self._tokens):
             return self._emit()
-        result = full[:space]
-        remainder = full[space + 1:]
-        self._tokens = remainder.split(" ") if remainder else []
+        result = "".join(self._tokens[:cut])
+        self._tokens = self._tokens[cut:]
         self._first_token_time = time.monotonic()
         self._ready_to_emit = False
         return result
