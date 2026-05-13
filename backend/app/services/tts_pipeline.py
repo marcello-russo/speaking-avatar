@@ -8,24 +8,25 @@ class TtsPipeline:
         self.voice = voice
         self.audio_queue = audio_queue
         self.cache = cache or AudioCache()
-        self._semaphore = asyncio.Semaphore(1)  # FIFO: ordine delle frasi preservato
+        self._semaphore = asyncio.Semaphore(5)
         self._pending = 0
+        self._seq = 0
         self._all_done = asyncio.Event()
         self._all_done.set()
 
     async def enqueue(self, text: str):
         self._pending += 1
         self._all_done.clear()
+        seq = self._seq
+        self._seq += 1
+        asyncio.create_task(self._synthesize(text, seq))
 
-    async def enqueue(self, text: str):
-        self._pending += 1
-        asyncio.create_task(self._synthesize(text))
-
-    async def _synthesize(self, text: str):
+    async def _synthesize(self, text: str, seq: int):
         try:
             async with self._semaphore:
                 cached = self.cache.get(text)
                 if cached:
+                    cached["seq"] = seq
                     await self.audio_queue.put(cached)
                     return
 
@@ -44,6 +45,7 @@ class TtsPipeline:
                 full_mp3 = bytes(audio_bytes)
                 event = {
                     "type": "audio_complete",
+                    "seq": seq,
                     "data": base64.b64encode(full_mp3).decode(),
                     "dur": round(total_dur, 3),
                     "visemes": _calc_visemes(text, total_dur),
