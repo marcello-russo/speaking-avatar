@@ -32,6 +32,9 @@ class TtsPipeline:
                         audio_bytes.extend(chunk["data"])
                         total_dur += len(chunk["data"]) / 16000
 
+                if not audio_bytes:
+                    return
+
                 full_mp3 = bytes(audio_bytes)
                 event = {
                     "type": "audio_complete",
@@ -41,6 +44,8 @@ class TtsPipeline:
                 }
                 self.cache.put(text, event)
                 await self.audio_queue.put(event)
+        except Exception:
+            pass
         finally:
             self._pending -= 1
             if self._pending == 0:
