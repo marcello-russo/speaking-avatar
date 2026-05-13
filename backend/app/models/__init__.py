@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     message: str
     context: str | dict | list | None = None
     session_id: str = ""
+    voice: str = "it-IT-ElsaNeural"
     mode: Literal["minimal", "widget", "full"] = "widget"
 
 class ChatResponse(BaseModel):
