@@ -9,35 +9,42 @@ class TtsPipeline:
         self.audio_queue = audio_queue
         self.cache = cache or AudioCache()
         self._semaphore = asyncio.Semaphore(2)
+        self._pending = 0
 
     async def enqueue(self, text: str):
+        self._pending += 1
         asyncio.create_task(self._synthesize(text))
 
     async def _synthesize(self, text: str):
-        async with self._semaphore:
-            cached = self.cache.get(text)
-            if cached:
-                for chunk in cached:
-                    await self.audio_queue.put(chunk)
-                return
+        try:
+            async with self._semaphore:
+                cached = self.cache.get(text)
+                if cached:
+                    for chunk in cached:
+                        await self.audio_queue.put(chunk)
+                    return
 
-            import edge_tts
-            chunks = []
-            tts = edge_tts.Communicate(text, self.voice)
-            async for chunk in tts.stream():
-                if chunk["type"] == "audio":
-                    dur = len(chunk["data"]) / 16000
-                    b64 = base64.b64encode(chunk["data"]).decode()
-                    event = {
-                        "type": "audio",
-                        "chunk": b64,
-                        "dur": round(dur, 3),
-                        "visemes": _calc_visemes(text, dur),
-                    }
-                    chunks.append(event)
-                    await self.audio_queue.put(event)
+                import edge_tts
+                chunks = []
+                tts = edge_tts.Communicate(text, self.voice)
+                async for chunk in tts.stream():
+                    if chunk["type"] == "audio":
+                        dur = len(chunk["data"]) / 16000
+                        b64 = base64.b64encode(chunk["data"]).decode()
+                        event = {
+                            "type": "audio",
+                            "chunk": b64,
+                            "dur": round(dur, 3),
+                            "visemes": _calc_visemes(text, dur),
+                        }
+                        chunks.append(event)
+                        await self.audio_queue.put(event)
 
-            self.cache.put(text, chunks)
+                self.cache.put(text, chunks)
+        finally:
+            self._pending -= 1
+            if self._pending == 0:
+                await self.audio_queue.put(None)
 
 
 def _calc_visemes(text: str, duration: float) -> list[dict]:
