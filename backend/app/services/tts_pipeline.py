@@ -10,6 +10,12 @@ class TtsPipeline:
         self.cache = cache or AudioCache()
         self._semaphore = asyncio.Semaphore(2)
         self._pending = 0
+        self._all_done = asyncio.Event()
+        self._all_done.set()
+
+    async def enqueue(self, text: str):
+        self._pending += 1
+        self._all_done.clear()
 
     async def enqueue(self, text: str):
         self._pending += 1
@@ -49,7 +55,14 @@ class TtsPipeline:
         finally:
             self._pending -= 1
             if self._pending == 0:
+                self._all_done.set()
                 await self.audio_queue.put(None)
+
+    async def wait_for_all(self, timeout: float = 5.0):
+        try:
+            await asyncio.wait_for(self._all_done.wait(), timeout=timeout)
+        except asyncio.TimeoutError:
+            pass
 
 
 def _calc_visemes(text: str, duration: float) -> list[dict]:
