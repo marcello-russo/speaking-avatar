@@ -8,7 +8,7 @@ class TtsPipeline:
         self.voice = voice
         self.audio_queue = audio_queue
         self.cache = cache or AudioCache()
-        self._semaphore = asyncio.Semaphore(2)
+        self._semaphore = asyncio.Semaphore(5)  # I/O-bound, più concorrenza = meglio
         self._pending = 0
         self._all_done = asyncio.Event()
         self._all_done.set()
@@ -58,11 +58,12 @@ class TtsPipeline:
                 self._all_done.set()
                 await self.audio_queue.put(None)
 
-    async def wait_for_all(self, timeout: float = 5.0):
+    async def wait_for_all(self, timeout: float = 30.0):
         try:
             await asyncio.wait_for(self._all_done.wait(), timeout=timeout)
         except asyncio.TimeoutError:
-            pass
+            import sys
+            print(f"[TtsPipeline] timeout after {timeout}s, {self._pending} tasks still pending", file=sys.stderr)
 
 
 def _calc_visemes(text: str, duration: float) -> list[dict]:
