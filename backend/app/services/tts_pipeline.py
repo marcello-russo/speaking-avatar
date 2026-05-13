@@ -58,7 +58,7 @@ class TtsPipeline:
                 self._all_done.set()
                 await self.audio_queue.put(None)
 
-    async def wait_for_all(self, timeout: float = 30.0):
+    async def wait_for_all(self, timeout: float = 60.0):
         try:
             await asyncio.wait_for(self._all_done.wait(), timeout=timeout)
         except asyncio.TimeoutError:

@@ -54,5 +54,6 @@ def build_prompt(ctx: dict) -> str:
     context_str = " | ".join(parts) if parts else "Conversazione generale"
     return f"""Sei un tutor AI amichevole. Rispondi in modo chiaro e coinvolgente, adattandoti al livello dello studente.
 Rispondi sempre nella stessa lingua dello studente.
+Rispondi in modo conciso, massimo 4-5 frasi.
 Non usare formattazione markdown, grassetto, corsivo, elenchi puntati, titoli, codice, emoji, o caratteri speciali. Rispondi solo con testo semplice.
 Contesto attuale: {context_str}"""
