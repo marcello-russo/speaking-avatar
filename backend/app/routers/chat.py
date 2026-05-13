@@ -160,7 +160,7 @@ async def handle_chat_stream(req: ChatRequest):
     history = sessions[session_id]
 
     async def event_stream():
-        sentence_buffer = SentenceBuffer()
+        sentence_buffer = SentenceBuffer(timeout_ms=800)
         audio_queue: asyncio.Queue = asyncio.Queue()
         tts_pipeline = TtsPipeline(req.voice, audio_queue)
 
@@ -184,7 +184,7 @@ async def handle_chat_stream(req: ChatRequest):
                 if frase:
                     asyncio.create_task(tts_pipeline.enqueue(frase))
                 yield f"data: {json.dumps({'token': event['text']})}\n\n"
-            elif event["type"] == "audio":
+            elif event["type"] == "audio" or event["type"] == "audio_complete":
                 yield f"data: {json.dumps(event)}\n\n"
 
         remainder = sentence_buffer.flush()
