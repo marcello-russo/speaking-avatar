@@ -20,27 +20,27 @@ class TtsPipeline:
             async with self._semaphore:
                 cached = self.cache.get(text)
                 if cached:
-                    for chunk in cached:
-                        await self.audio_queue.put(chunk)
+                    await self.audio_queue.put(cached)
                     return
 
                 import edge_tts
-                chunks = []
+                audio_bytes = bytearray()
+                total_dur = 0.0
                 tts = edge_tts.Communicate(text, self.voice)
                 async for chunk in tts.stream():
                     if chunk["type"] == "audio":
-                        dur = len(chunk["data"]) / 16000
-                        b64 = base64.b64encode(chunk["data"]).decode()
-                        event = {
-                            "type": "audio",
-                            "chunk": b64,
-                            "dur": round(dur, 3),
-                            "visemes": _calc_visemes(text, dur),
-                        }
-                        chunks.append(event)
-                        await self.audio_queue.put(event)
+                        audio_bytes.extend(chunk["data"])
+                        total_dur += len(chunk["data"]) / 16000
 
-                self.cache.put(text, chunks)
+                full_mp3 = bytes(audio_bytes)
+                event = {
+                    "type": "audio_complete",
+                    "data": base64.b64encode(full_mp3).decode(),
+                    "dur": round(total_dur, 3),
+                    "visemes": _calc_visemes(text, total_dur),
+                }
+                self.cache.put(text, event)
+                await self.audio_queue.put(event)
         finally:
             self._pending -= 1
             if self._pending == 0:
