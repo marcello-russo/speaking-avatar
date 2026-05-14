@@ -20,6 +20,12 @@
 	let scene: THREE.Scene;
 	let camera: THREE.PerspectiveCamera;
 	let renderer: THREE.WebGLRenderer;
+
+	function staticUrl(path: string): string {
+		const base = ((window as any).__AVATAR_STATIC_BASE__ || '').replace(/\/+$/, '');
+		const cleanPath = path.replace(/^\/+/, '');
+		return base ? base + '/' + cleanPath : '/' + cleanPath;
+	}
 	let controls: OrbitControls;
 	let avatar: THREE.Object3D;
 	let headMesh: any; // For accessing morph targets
@@ -247,7 +253,7 @@
 
 		// Load selected avatar model from static/avatar directory
 		// This uses the ID from user preferences to load the appropriate GLB file
-		const avatarPath = `/static/avatar/${selectedAvatarId}.glb`;
+		const avatarPath = staticUrl(`/static/avatar/${selectedAvatarId}.glb`);
 		console.log(`Loading avatar from: ${avatarPath}`);
 		await loadAvatar(avatarPath);
 
@@ -1354,7 +1360,48 @@
 		}
 	}
 
+	function sanitizeForTTS(text) {
+		return text
+			// Remove bold/italic markdown: **text** or *text*
+			.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+			// Remove inline code: `text`
+			.replace(/`([^`]+)`/g, '$1')
+			// Remove headings: # Heading
+			.replace(/^#{1,6}\s+/gm, '')
+			// Remove bullet lists: - or * at line start
+			.replace(/^[\s]*[-*+]\s+/gm, '')
+			// Remove numbered lists: 1. 2. etc
+			.replace(/^\s*\d+\.\s+/gm, '')
+			// Remove blockquotes: >
+			.replace(/^>\s+/gm, '')
+			// Remove horizontal rules
+			.replace(/^[-*_]{3,}\s*$/gm, '')
+			// Remove links: [text](url) -> text
+			.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+			// Remove standalone URLs
+			.replace(/https?:\/\/[^\s]+/g, '')
+			// Remove code blocks
+			.replace(/```[\s\S]*?```/g, '')
+			// Remove emoji characters
+			.replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+			.replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+			.replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+			.replace(/[\u{2600}-\u{26FF}]/gu, '')
+			.replace(/[\u{2700}-\u{27BF}]/gu, '')
+			.replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+			.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+			.replace(/[\u{231A}-\u{231B}]/gu, '')
+			.replace(/[\u{23E9}-\u{23F3}]/gu, '')
+			.replace(/[\u{23F8}-\u{23FA}]/gu, '')
+			.replace(/[\u{25AA}-\u{25AB}]/gu, '')
+			.replace(/[\u{25FB}-\u{25FE}]/gu, '')
+			// Collapse multiple spaces/newlines
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
 	function speakText(text: string) {
+		text = sanitizeForTTS(text);
 		resetVisemes();
 		resetGestures();
 		createVisemeSequence(text);
@@ -1952,10 +1999,10 @@
 		}
 
 		// Fix the path construction to ensure correct URL format
-		// Always use absolute path from the site root
-		const fullPath = animationPath.startsWith('/')
-			? animationPath // Keep the leading slash for absolute paths
-			: '/' + animationPath; // Add leading slash for relative paths
+		const normalized = animationPath.startsWith('/')
+			? animationPath
+			: '/' + animationPath;
+		const fullPath = staticUrl(normalized);
 
 		console.log(`Full animation path: ${fullPath}`);
 
@@ -2548,7 +2595,7 @@
 	}
 </script>
 
-<div class={className} bind:this={avatarContainer} style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;">
+<div class={className} bind:this={avatarContainer} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
 	{#if loading}
 		<div class="flex items-center justify-center w-full h-full">
 			<Spinner />
