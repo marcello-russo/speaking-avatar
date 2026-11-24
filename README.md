@@ -1,53 +1,28 @@
-<div align="center">
-  <h1>🎙️ Speaking Avatar</h1>
-  <p><strong>Open source 3D speaking avatar microservice.</strong><br>
-  Zero-UI web component — bring your own chat interface.</p>
+# Speaking Avatar
 
-  <p>
-    <a href="https://github.com/marcello-russo/speaking-avatar/stargazers">
-      <img src="https://img.shields.io/github/stars/marcello-russo/speaking-avatar?style=flat-square" alt="Stars">
-    </a>
-    <a href="https://github.com/marcello-russo/speaking-avatar/blob/main/LICENSE">
-      <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License">
-    </a>
-    <img src="https://img.shields.io/badge/3D-Three.js-purple?style=flat-square" alt="Three.js">
-    <img src="https://img.shields.io/badge/TTS-Edge%20AI-blue?style=flat-square" alt="Edge TTS">
-    <img src="https://img.shields.io/badge/LLM-Anthropic%2FOpenAI%2FOllama-green?style=flat-square" alt="LLM">
-    <img src="https://img.shields.io/badge/Web_Component-Svelte-orange?style=flat-square" alt="Web Component">
-  </p>
+<img src="assets/cover.png" width="320" alt="The Coach, one of the four bundled avatars">
 
-  ```html
-  <script src="speaking-avatar.umd.js"></script>
-  <speaking-avatar></speaking-avatar>
-  ```
-</div>
+A 3D talking avatar that runs in any page as a web component. The browser renders the character; a
+small Python backend streams the reply from an LLM and speaks it sentence by sentence; the model's
+visemes drive the lip-sync.
 
----
+Status: a prototype, built in May 2026 and published on npm as `speaking-avatar`. It is not under
+active development, so issues may go unanswered. It exists because of the Moodle block in this
+repository: the goal was a lip-synced tutor inside a course page, and both halves are here.
 
-## ✨ Features
+## What works
 
-| 🧑 **3D Avatar** | Real-time rendered character with lip-sync, facial expressions, and body gestures (Three.js) |
-| 🗣️ **Text-to-Speech** | Natural voices via Microsoft Edge TTS, progressive sentence-level streaming |
-| 🧠 **LLM agnostic** | Anthropic, OpenAI-compatible, OpenRouter, Ollama — plug any provider |
-| 🧩 **Zero-UI** | Pure avatar, no chat bubbles or FAB built-in. You build the interface, we render the face |
-| ⚡ **SSE streaming** | Token-by-token text + concurrent sentence-level audio in a single stream |
-| 🐳 **Docker** | `docker compose up` to run the full stack |
+- `<speaking-avatar>`, a custom element that mounts a Three.js scene with one of four rigged avatars.
+  The models carry ARKit viseme morph targets, so the mouth follows the audio instead of a loop.
+- A FastAPI backend with `/health`, `/chat`, `/chat/stream` (SSE), `/tts` and `/stt`.
+- Streaming: tokens reach the page immediately, a `SentenceBuffer` cuts the text at `. ! ?` (forced
+  at 80 characters, 800 ms timeout), and each sentence goes to Edge TTS concurrently. Audio events
+  carry a `seq`, so the client can reorder them before playback.
+- Four LLM backends: OpenRouter, any OpenAI-compatible endpoint, Anthropic, and Ollama. Speech to
+  text runs on faster-whisper, or on a mock engine when no model is downloaded.
+- Docker Compose for the full stack, and a Moodle block that embeds the component in a course.
 
-## 🚀 Quick Start
-
-### Option 1: Docker (recommended)
-
-```bash
-git clone https://github.com/marcello-russo/speaking-avatar
-cd speaking-avatar
-cp backend/.env.example backend/.env
-# Edit backend/.env → add an LLM API key (see below)
-docker compose up -d
-```
-
-Open **http://localhost:5173** — the avatar renders with a built-in demo UI.
-
-### Option 2: npm / CDN
+## Install
 
 ```bash
 npm install speaking-avatar
@@ -58,130 +33,138 @@ npm install speaking-avatar
 <speaking-avatar></speaking-avatar>
 ```
 
-```javascript
+```js
 const avatar = document.querySelector('speaking-avatar');
-avatar.speak('Hello!');           // TTS
-avatar.ask('What is gravity?');   // LLM + TTS
-avatar.listen(audioBlob);         // STT
-avatar.configure({ ttsApi: '...' });
+avatar.speak('Hello!');           // text to speech
+avatar.ask('What is gravity?');   // LLM reply, spoken progressively
+avatar.listen(audioBlob);         // speech to text
+avatar.configure({ avatar: 'The Scholar' });
 ```
 
-### Option 3: Dev server
+Give the element a height, or a parent that does. Without one it falls back to 320 px.
+
+## Run the full stack
 
 ```bash
-cd web-component && npm run dev     # :5173
-cd backend && uvicorn app.main:app  # :8000
+git clone https://github.com/marcello-russo/speaking-avatar
+cd speaking-avatar
+cp backend/.env.example backend/.env   # add one LLM provider key
+docker compose up -d
 ```
 
-## ⚙️ Props
+The demo page is at http://localhost:5173, the API at http://localhost:8000.
 
-| Prop | Default | Description |
-|------|---------|-------------|
-| `tts-api` | `http://localhost:8000/api/v1` | TTS endpoint base URL |
+## Attributes
+
+| Attribute | Default | Description |
+|---|---|---|
+| `tts-api` | `http://localhost:8000/api/v1` | TTS endpoint |
 | `stt-api` | `http://localhost:8000/api/v1/stt` | STT endpoint |
-| `llm-api` | `http://localhost:8000/api/v1/chat/stream` | LLM streaming endpoint |
+| `llm-api` | `http://localhost:8000/api/v1/chat/stream` | Streaming chat endpoint |
 | `voice` | `it-IT-ElsaNeural` | Edge TTS voice |
-| `avatar` | `The Coach` | 3D model: `The Coach`, `The Scholar`, `The Mentor`, `The Innovator` |
-| `context` | `""` | Course / lesson context passed to the LLM |
+| `avatar` | `The Coach` | `The Coach`, `The Scholar`, `The Mentor`, `The Innovator` |
+| `context` | empty | Course or lesson context passed to the LLM |
+| `min-height` | `320px` | Height used when the page does not constrain the element |
 
 ### Methods
 
 | Method | Returns | Description |
-|--------|---------|-------------|
-| `speak(text)` | `Promise<void>` | Speak the given text via TTS |
-| `ask(message)` | `Promise<string>` | Send message to LLM via SSE, speak progressively, return full reply |
-| `listen(audio)` | `Promise<string>` | Transcribe audio via backend STT |
-| `configure(opts)` | `void` | Update props at runtime |
+|---|---|---|
+| `speak(text)` | `Promise<void>` | Speak the text through the TTS endpoint |
+| `ask(message)` | `Promise<string>` | Stream a reply, speak it as it arrives, return the full text |
+| `listen(audio)` | `Promise<string>` | Transcribe an audio blob |
+| `configure(opts)` | `void` | Change attributes at runtime |
 
 ### Events
 
-| Event | Detail | Description |
-|-------|--------|-------------|
-| `speechstart` | `{ text }` | Avatar started speaking |
-| `speechend` | `{ text }` | Avatar finished speaking |
-| `viseme` | `{ viseme, time }` | Lip-sync viseme event |
-| `error` | `{ error, source }` | Error from LLM, TTS, or STT |
+| Event | Detail | Fired when |
+|---|---|---|
+| `speechstart` | `{ text }` | Playback of a sentence starts |
+| `speechend` | `{ text }` | Playback of a sentence ends |
+| `viseme` | `{ viseme, time }` | The mouth moves to a viseme |
+| `error` | `{ error, source }` | The LLM, TTS or STT call fails |
 
-## 🏗️ Backend API
+## API
 
 | Route | Method | Description |
-|-------|--------|-------------|
-| `/api/v1/health` | `GET` | Health check |
-| `/api/v1/chat` | `POST` | Non-streaming chat (returns complete reply) |
-| `/api/v1/chat/stream` | `POST` | SSE streaming: `token` (text) + `audio_complete` (base64 MP3) events |
-| `/api/v1/tts` | `POST` | Text-to-speech (returns MP3 blob) |
-| `/api/v1/stt` | `POST` | Speech-to-text (Whisper or mock) |
+|---|---|---|
+| `/api/v1/health` | GET | Health check |
+| `/api/v1/chat` | POST | Whole reply in one response |
+| `/api/v1/chat/stream` | POST | SSE: `token`, `audio_complete`, `done` |
+| `/api/v1/tts` | POST | MP3 for a given text |
+| `/api/v1/stt` | POST | Transcript for an uploaded clip |
 
-### SSE event types
+The SSE stream carries text and audio on the same connection:
 
 ```
 event: token           {"type":"token","text":"Ciao"}
-event: audio_complete  {"type":"audio_complete","seq":0,"data":"<base64>","dur":1.2}
+event: audio_complete  {"type":"audio_complete","seq":0,"data":"<base64 mp3>","dur":1.2}
 event: done            {"type":"done","session_id":"..."}
 ```
 
-Audio events include a `seq` counter — the frontend reorders them for correct playback.
-
-### Env vars
+## Configuration
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `LLM_PROVIDER` | `openrouter` | `anthropic` \| `openai` \| `openrouter` \| `ollama` |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key or any Anthropic-compatible (e.g. GLM via `api.z.ai`) |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Custom endpoint for Anthropic-compatible providers |
-| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Model name |
-| `OPENAI_API_KEY` | — | OpenAI / GLM / vLLM / Together / Groq API key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom endpoint for OpenAI-compatible providers |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Model name |
-| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+|---|---|---|
+| `LLM_PROVIDER` | `openrouter` | `openrouter`, `openai`, `anthropic` or `ollama` |
+| `OPENROUTER_API_KEY` | — | OpenRouter key |
 | `OPENROUTER_MODEL` | `openai/gpt-4o-mini` | Model name |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |
+| `OPENAI_API_KEY` | — | Any OpenAI-compatible key |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Custom endpoint (vLLM, Groq, Together) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model name |
+| `ANTHROPIC_API_KEY` | — | Anthropic key |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Custom Anthropic-compatible endpoint |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Model name |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama |
 | `OLLAMA_MODEL` | `llama3` | Model name |
 | `TTS_VOICE` | `it-IT-ElsaNeural` | Edge TTS voice |
 | `STT_ENGINE` | `mock` | `whisper` or `mock` |
 
-## 🧑‍🎨 Custom Avatars
-
-4 pre-built 3D avatars with full skeletal animation and ARKit viseme morph targets:
-
-| Avatar | Personality |
-|--------|-------------|
-| **The Coach** | Energetic, motivational, direct |
-| **The Scholar** | Analytical, detail-oriented, patient |
-| **The Mentor** | Encouraging, warm, supportive |
-| **The Innovator** | Creative, curious, thought-provoking |
-
-Add custom GLB models with ARKit-standard viseme morph targets.
-
-## 🧪 Local Development
-
-```bash
-# Backend
-cd backend && pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-
-# Web Component
-cd web-component && npm install && npm run dev
-```
-
-## Architecture
+## How the stream is assembled
 
 ```
-SSE stream ──► /chat/stream ──► LLM Provider
+SSE stream ──► /chat/stream ──► LLM provider
                    │
             ┌──────┴──────┐
-            │             │
-      event "token"   SentenceBuffer → TTS Pipeline
-      (text,            (word-aware     (Edge TTS,
-       immediate)       boundary,       concurrent,
-                        800ms timeout)  seq-numbered)
+      event "token"   SentenceBuffer ──► TTS pipeline
+      (text,           (word-aware        (Edge TTS,
+       immediate)       boundary,         concurrent,
+                        80 chars,         seq-numbered)
+                        800 ms)
                               │
                         event "audio_complete"
                         (base64 MP3 + seq + dur)
 ```
 
-The LLM stream feeds a `SentenceBuffer` that emits complete sentences using adaptive boundary detection (primary `. ! ?`, forced at 80 chars, timeout at 800ms). Each sentence goes to the TTS pipeline which runs Edge TTS concurrently — audio events carry a `seq` field so the frontend can reorder them before playback.
+Text and audio are independent: the first token reaches the page while the model is still writing,
+and audio for sentence one plays while sentence two is being synthesised.
 
-## 📄 License
+## Development
 
-MIT — use it anywhere, for anything.
+```bash
+# backend
+cd backend
+python -m venv .venv && . .venv/bin/activate
+pip install pytest pytest-asyncio
+python -m pytest tests -q
+
+# web component
+cd web-component
+npm ci
+npm run dev      # demo page on :5173
+npm run build    # dist/speaking-avatar.{es,umd}.js
+```
+
+CI runs both on every push. Editing `web-component/package.json` on `main` publishes to npm.
+
+## Known limits
+
+- The frontend still uses Svelte 4 syntax (`export let`), so the build prints migration warnings on
+  Svelte 5. It compiles and runs.
+- The faster-whisper models are downloaded on first use; `STT_ENGINE=mock` keeps the container small.
+- The four avatars are the only tested models. Custom GLBs need an ARKit-compatible viseme set.
+- No tests cover the frontend; the backend has tests for the audio cache and the sentence buffer.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
