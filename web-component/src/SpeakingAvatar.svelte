@@ -158,6 +158,6 @@
 </div>
 
 <style>
-  .sa-root { width: 100%; height: 100%; position: relative; }
+  .sa-root { width: 100%; height: 100%; min-height: inherit; position: relative; }
   .sa-root :global(canvas) { width: 100% !important; height: 100% !important; }
 </style>

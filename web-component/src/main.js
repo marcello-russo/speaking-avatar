@@ -14,6 +14,8 @@ class SpeakingAvatarElement extends HTMLElement {
     };
 
     this.style.display = 'block';
+    this.style.height = '100%';
+    this.style.minHeight = this.getAttribute('min-height') || '320px';
 
     const inst = mount(SpeakingAvatar, { target: this, props });
 
